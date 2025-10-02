@@ -35,20 +35,22 @@ public class BudgetService {
     private final TransactionRepository transactionRepository;
 
     /**
-     * Create a new budget
+     * Create a new budget for a specific category and month.
+     * Prevents duplicate budgets for the same category/month/year combination.
      */
     @Transactional
     public BudgetResponse createBudget(BudgetRequest request, User currentUser) {
         
-        // Validate category exists and user can access it
+        // First, verify the category exists
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
         
+        // Users can create budgets for default categories or their own custom categories
         if (category.getUser() != null && !category.getUser().getId().equals(currentUser.getId())) {
             throw new UnauthorizedAccessException("You can only create budgets for your own categories or default categories");
         }
         
-        // Check for duplicate budget (same user, category, month, year)
+        // Prevent duplicate budgets - one budget per category per month
         Optional<Budget> existing = budgetRepository.findByUserIdAndCategoryIdAndMonthAndYear(
             currentUser.getId(), request.getCategoryId(), request.getMonth(), request.getYear()
         );
@@ -60,7 +62,7 @@ public class BudgetService {
             );
         }
         
-        // Create budget
+        // All validations passed - create the budget
         Budget budget = new Budget();
         budget.setUser(currentUser);
         budget.setCategory(category);
@@ -170,27 +172,28 @@ public class BudgetService {
     }
 
     /**
-     * Get budget alerts for current month (budgets exceeding 80% or 100%)
+     * Get budget alerts for current month.
+     * Returns budgets that are at 80% (WARNING) or 100%+ (DANGER) of their limit.
      */
     public List<BudgetAlertResponse> getBudgetAlerts(User currentUser) {
         
-        // Get current month and year
         LocalDate now = LocalDate.now();
         int currentMonth = now.getMonthValue();
         int currentYear = now.getYear();
         
-        // Get all budgets for current month
+        // Fetch all budgets for the current month
         List<Budget> budgets = budgetRepository.findByUserIdAndMonthAndYear(
             currentUser.getId(), currentMonth, currentYear
         );
         
         List<BudgetAlertResponse> alerts = new ArrayList<>();
         
+        // Check each budget against its spending
         for (Budget budget : budgets) {
             BigDecimal spending = calculateCurrentSpending(budget);
             double percentageUsed = calculatePercentage(spending, budget.getLimitAmount());
             
-            // Only alert if 80% or more used
+            // Alert thresholds: 80% = WARNING, 100% = DANGER
             if (percentageUsed >= 80.0) {
                 int daysLeft = YearMonth.of(currentYear, currentMonth).lengthOfMonth() - now.getDayOfMonth();
                 
@@ -216,20 +219,22 @@ public class BudgetService {
     }
 
     /**
-     * Calculate current spending for a budget
+     * Calculate current spending for a budget by summing relevant transactions.
+     * Note: We calculate on-demand rather than storing the value to ensure accuracy
+     * and avoid synchronization issues when transactions are added/deleted.
      */
     private BigDecimal calculateCurrentSpending(Budget budget) {
         
-        // Calculate start and end dates for the month
+        // Determine the date range for this budget's month
         LocalDate startDate = LocalDate.of(budget.getYear(), budget.getMonth(), 1);
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
         
-        // Get all expense transactions for this category in this month
+        // Fetch all transactions in the date range
         List<Transaction> transactions = transactionRepository.findByUserIdAndTransactionDateBetween(
             budget.getUser().getId(), startDate, endDate
         );
         
-        // Filter by category and transaction type (EXPENSE only)
+        // Sum only EXPENSE transactions that match this budget's category
         BigDecimal total = transactions.stream()
                 .filter(t -> t.getCategory().getId().equals(budget.getCategory().getId()))
                 .filter(t -> t.getTransactionType() == TransactionType.EXPENSE)

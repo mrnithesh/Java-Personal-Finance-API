@@ -28,31 +28,33 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     /**
-     * Initialize default categories on application startup
+     * Automatically create default categories when the application starts.
+     * This ensures all users have a base set of categories to work with.
+     * Only runs once - skips if categories already exist.
      */
     @PostConstruct
     @Transactional
     public void initializeDefaultCategories() {
         
-        // Check if default categories already exist
+        // Check if we've already set up default categories
         List<Category> existingDefaults = categoryRepository.findByIsDefaultTrue();
         if (!existingDefaults.isEmpty()) {
             log.info("Default categories already initialized: {} categories found", existingDefaults.size());
             return;
         }
         
-        log.info("Initializing default categories...");
+        log.info("First run detected - initializing default categories...");
         
         List<Category> defaultCategories = new ArrayList<>();
         
-        // Income categories
+        // Set up common income categories
         defaultCategories.add(createDefaultCategory("Salary", TransactionType.INCOME));
         defaultCategories.add(createDefaultCategory("Freelance", TransactionType.INCOME));
         defaultCategories.add(createDefaultCategory("Investment", TransactionType.INCOME));
         defaultCategories.add(createDefaultCategory("Gift", TransactionType.INCOME));
         defaultCategories.add(createDefaultCategory("Other Income", TransactionType.INCOME));
         
-        // Expense categories
+        // Set up common expense categories
         defaultCategories.add(createDefaultCategory("Food & Dining", TransactionType.EXPENSE));
         defaultCategories.add(createDefaultCategory("Transportation", TransactionType.EXPENSE));
         defaultCategories.add(createDefaultCategory("Shopping", TransactionType.EXPENSE));
