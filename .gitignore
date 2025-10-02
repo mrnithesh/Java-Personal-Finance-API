@@ -81,3 +81,15 @@ Thumbs.db
 
 # Application-specific
 application-local.properties
+
+#local documentation
+PHASE1_SUMMARY.md
+PHASE2_SUMMARY.md
+PHASE3_SUMMARY.md
+PHASE4_SUMMARY.md
+PHASE5_SUMMARY.md
+PHASE6_SUMMARY.md
+PHASE7_SUMMARY.md
+phase3_testing_results.md
+plan.md
+quick_start.md
